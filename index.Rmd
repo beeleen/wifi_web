@@ -1,5 +1,20 @@
 ---
-title: "My Website"
+title: "Wi Fi Positioning Project"
+author: virgen.io
+date: Aug-Sept, 2019
+output:
+   html_document:
+      includes:
+         after_body: footer.html
+         before_body: header.html
+      theme: united
+      highlight: textmate
+
 ---
 
-Hello, Website!
+
+<h1>Introduction</h1>
+Many real world applications need to know the localization of a user in the world to provide their services. Outdoor localization problem can be solved very accurately thanks to the inclusion of GPS sensors into the mobile devices. However, indoor localization is still an open problem mainly due to the loss of GPS signal in indoor environments. For this reason, we evaluated the application of machine learning techniques to this problem, replacing the GPS signal with WAPS signal.
+
+<h2>Project Goal</h2>
+Investigate the possibility of using "WiFi Access Points" to determine a person's location inside closed facilities. Aim is to do an exploratory analysis and cleaning of the provided datasets, and determine which machine learning models are the best suited to predict  Building ID, Latitude, Longitude and Floor.

@@ -1,7 +1,7 @@
 ---
 title: "Data exploration"
-author: VirgenStudio
-date: Sept 10, 2019
+author: virgen.io
+date: Aug-Sept, 2019
 output:
    html_document:
       includes:
@@ -22,7 +22,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 pacman::p_load(ggplot2, dplyr, party, caret, corrplot, reshape, rpart, rattle, psych, tidyr, stringr, randomForest, tictoc, corrplot)
 
-wifidataTrain <- read.csv("~/Documents/@/UBIQUM/DATAML/ModuleIOT/WIFI/datasets/trainingData.csv")
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+setwd("~/Documents/@/UBIQUM/DATAML/ModuleIOT/wifi_github")
+
+
+wifidataTrain <- read.csv("./Data_Exploration_Datasets/trainingData.csv")
 
 #Remove Scientific notations
 options(scipen=999)
@@ -35,6 +40,17 @@ options(scipen=999)
  
 
 ```
+ <h1>Statistics</h1>
+```{r}
+#Descriptive Statistics @psych package
+#Describe the first 50 columns
+describe(wifidataTrain[1:50])
+
+#Describe the categorical columns
+describe(wifidataTrain[525:529])
+```
+ 
+ 
  <h1> Preprocessing </h1>
 ```{r}
  
@@ -42,13 +58,6 @@ options(scipen=999)
 wifidataTrain$BUILDINGID <- as.factor(wifidataTrain$BUILDINGID) 
 wifidataTrain$SPACEID <- as.factor(wifidataTrain$SPACEID) 
 wifidataTrain$FLOOR <- as.factor(wifidataTrain$FLOOR) 
-
-#Descriptive Statistics @psych package
-#Describe the first 50 columns
-describe(wifidataTrain[1:50])
-
-#Describe the categorical columns
-describe(wifidataTrain[525:529])
 
 #I've found a lot of rows with 0 Range. For that I remove the ones with Zero Variance
 Zerobar <- nearZeroVar(wifidataTrain,saveMetrics = TRUE)
@@ -73,7 +82,7 @@ highCorr <- sum(abs(corrData[upper.tri(corrData)]) > .999)
 #i've found there are values above 0.99
 summary(corrData[upper.tri(corrData)])
 
-#Select correlated values above .75
+#Select correlated values above .75 (112 rows) / above .8 (86 rows) / above .85 (48 rows) / above .9 (20 rows) / above .95  (5 rows)
 highlyCorDescr <- findCorrelation(corrData, cutoff = .75)
 
 #Remove the 112 correlated variables

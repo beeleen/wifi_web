@@ -1,0 +1,6 @@
+"0","#I've found a lot of rows with 0 Range. For that I remove the ones with Zero Variance
+Zerobar <- nearZeroVar(wifidataTrain,saveMetrics = TRUE)
+"
+"2","Error in nearZeroVar(wifidataTrain, saveMetrics = TRUE) : 
+  could not find function ""nearZeroVar""
+"

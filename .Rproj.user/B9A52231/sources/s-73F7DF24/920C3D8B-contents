@@ -1,0 +1,298 @@
+---
+title: "Data exploration"
+author: virgen.io
+date: Aug-Sept, 2019
+output:
+   html_document:
+      includes:
+         after_body: footer.html
+         before_body: header.html
+      toc: true
+      toc_depth: 5
+      toc_float:
+          collapsed: false
+          smooth_scroll: true
+      theme: united
+      highlight: textmate
+
+---
+<h1> Initialize and Load Data </h1>
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load(ggplot2, dplyr, party, caret, corrplot, reshape, rpart, rattle, psych, tidyr, stringr, randomForest, tictoc, corrplot)
+
+wifidataTrain <- read.csv("~/Documents/@/UBIQUM/DATAML/ModuleIOT/WIFI/datasets/trainingData.csv")
+
+#Remove Scientific notations
+options(scipen=999)
+
+#Seed function
+ reset.seed <- function()
+{
+  set.seed(1337)
+ }
+ 
+
+```
+ <h1> Preprocessing </h1>
+```{r}
+ 
+#Convert Buildings, SpaceID and Floor as factors
+wifidataTrain$BUILDINGID <- as.factor(wifidataTrain$BUILDINGID) 
+wifidataTrain$SPACEID <- as.factor(wifidataTrain$SPACEID) 
+wifidataTrain$FLOOR <- as.factor(wifidataTrain$FLOOR) 
+
+#Descriptive Statistics @psych package
+#Describe the first 50 columns
+describe(wifidataTrain[1:50])
+
+#Describe the categorical columns
+describe(wifidataTrain[525:529])
+
+#I've found a lot of rows with 0 Range. For that I remove the ones with Zero Variance
+Zerobar <- nearZeroVar(wifidataTrain,saveMetrics = TRUE)
+wifidataTrain <- wifidataTrain[,!Zerobar$zeroVar]
+
+#remove duplicates
+wifidataTrain <- distinct(wifidataTrain)
+
+reset.seed()
+```
+
+<h2>Remove Correlated Variables</h2>
+```{r}
+
+#Create the correlation matrix
+corrData <- cor(wifidataTrain[,1:465])
+corrplot(corrData)
+
+#Extract highly correlated data (As documented in Caret Package https://web.archive.org/web/20180217114700/http://topepo.github.io/caret/pre-processing.html#corr)
+highCorr <- sum(abs(corrData[upper.tri(corrData)]) > .999)
+
+#i've found there are values above 0.99
+summary(corrData[upper.tri(corrData)])
+
+#Select correlated values above .75
+highlyCorDescr <- findCorrelation(corrData, cutoff = .75)
+
+#Remove the 112 correlated variables
+wifidataTrain <- wifidataTrain[,-highlyCorDescr]
+
+#Check again if we have removed all the correlated vars
+corrData2 <- cor(wifidataTrain[,1:353])  
+
+#Yes, now the Max. is 0.74...
+summary(corrData2[upper.tri(corrData2)])
+
+
+
+#Stratification for sampling
+#By spaceId?
+#Filtering by buildings? 
+# data_building_1_floor <- wifidataTrain %>% filter()
+
+
+```
+
+<h1> Modeling </h1>
+<h2>First and incorrect apprach</h2>
+```{r}
+#Splitting the data with ALL VARIABLES. Bad approach
+#intrain <- createDataPartition(y = wifiTrainSample$FLOOR, p= 0.7, list = FALSE)
+#train <- wifiTrainSample[intrain, ]
+#test <-  wifiTrainSample[-intrain, ]
+
+#trainControl
+#ctrl <- trainControl(method ="repeatedcv", repeats = 3, classProbs = TRUE, summaryFunction = multiClassSummary) 
+
+```
+
+
+```{r}
+#random forest with All Variables @Caret. Still bad approach
+#plsFit <- train(FLOOR~., data = train, method = "rf",tuneLength = 2, preProc = c("center", "scale")) 
+#plsFit
+
+#predrf <- predict(plsFit, newdata = test)
+#pred_metric_rf <- postResample(test$FLOOR, predrf)
+#pred_metric_rf
+
+```
+
+<h1>Sampling methods</h1>
+```{r}
+####################################################################
+
+reset.seed()
+
+#I've Took a sample of 1872 rows (that's the double of the references points we had)  but it was too much time consuming for caret..
+#wifiTrainSample <- wifidataTrain[sample(1:nrow(wifidataTrain), 1872, replace=FALSE),] 
+
+
+#Select variables only with WAPS + Floor
+wifiOnlyWaps <- wifidataTrain %>% select(c(1:353, 356))
+
+#Take a sample of 500
+wifiTrainSampleWaps <- wifiOnlyWaps[sample(1:nrow(wifiOnlyWaps), 500, replace=FALSE),] 
+
+```
+
+
+<h1> Predicting Floor </h1>
+<h2> Splitting data</h2>
+```{r}
+
+#Splitting
+intrainWaps <- createDataPartition(y = wifiTrainSampleWaps$FLOOR, p= 0.7, list = FALSE)
+trainWaps <- wifiTrainSampleWaps[intrainWaps, ]
+testWaps <-  wifiTrainSampleWaps[-intrainWaps, ]
+
+```
+
+<h2>RF</h2>
+<h3>Run the model</h3>
+```{r}
+#Random forest ~FLOOR @Caret
+
+               #Train the model
+               #plsFitWapsFloor <- train(FLOOR~., data = trainWaps, method = "rf") 
+
+#Save the model
+#save(plsFitWapsFloor, file = "Floor_RFSample.rda")
+
+#Upload the model
+load("Data_Exploration_Models/Floor_RFSample.rda") #plsFitWapsFloor
+
+```
+
+<h3>Prediction metrics</h3>
+```{r}
+
+#Get the metrics of the model
+plsFitWapsFloor
+
+#Predict the Test set
+predrf_Floor <- predict(plsFitWapsFloor, newdata = testWaps)
+
+#Post Resample
+pred_metric_rf_Floor <- postResample(testWaps$FLOOR, predrf_Floor)
+
+#Get the metrics for the test
+pred_metric_rf_Floor
+
+```
+
+<h3>Error Analysis</h3>
+```{r}
+#Error Analysis
+
+#create a new DF
+testWapsRF <- testWaps
+
+#create a new column with the predicted values
+testWapsRF$Predicted <- predrf_Floor
+
+#Confusion Matrix
+confusionMatrix(data= testWapsRF$Predicted, reference = testWapsRF$FLOOR)
+
+
+```
+
+<h2>KNN</h2>
+<h3>Run the model</h3>
+```{r}
+
+#KNN ~FLOOR @Caret
+
+#Train the model
+      #plsFitWapsFloorKNN <- train(FLOOR~., data = trainWaps, method = "knn",preProc = c("center", "scale")) 
+
+#Save the model
+#save(plsFitWapsFloorKNN, file = "Floor_KNNSample.rda")
+
+#Upload the model
+load("Data_Exploration_Models/Floor_KNNSample.rda") #plsFitWapsFloorKNN
+
+#Get the metrics of the model 
+plsFitWapsFloorKNN
+
+```
+
+<h3>Prediction metrics</h3>
+```{r}
+#Predict the Test set
+predrf_FloorKNN <- predict(plsFitWapsFloorKNN, newdata = testWaps)
+
+#Post Resample
+pred_metric_rf_FloorKNN <- postResample(testWaps$FLOOR, predrf_FloorKNN)
+
+#Get the metrics for the test
+pred_metric_rf_FloorKNN
+
+```
+
+
+<h3>Error Analysis</h3>
+```{r}
+#Error Analysis
+
+#create a new DF
+testWapsKNN <- testWaps
+
+#create a new column with the predicted values
+testWapsKNN$Predicted <- predrf_FloorKNN
+
+#Confusion Matrix
+confusionMatrix(data= testWapsKNN$Predicted, reference = testWapsKNN$FLOOR)
+
+
+```
+
+```{r}
+
+#LM ~FLOOR @Caret
+#plsFitWapsFloorLM <- train(FLOOR~., data = trainWaps, method = "lm",preProc = c("center", "scale")) 
+#plsFitWapsFloorLM
+
+
+```
+
+```{r}
+
+#random forest @Random Fores
+#RF <- randomForest(FLOOR ~ ., data = TrainSet, importance = TRUE)
+```
+<h2> Decision Tree </h2>
+```{r}
+
+rtree_model <- rpart(FLOOR~., data=trainWaps, maxdepth = 8 )
+fancyRpartPlot(rtree_model) 
+#rtree_model
+
+```
+
+```{r}
+# 
+# wifiOnlyWaps <- wifidataTrain[,1:521]
+# wifidataTrain[1,521:523]
+# wifidataTrain[1000:1200,524:529]
+# 
+# wifidataTest[1,1:521]
+# wifidataTest[1,510:529]
+# wifidataTest[1000:1200,521:529]
+# 
+# 
+# 
+# 
+# describe(wifidata[1:100])
+
+
+```
+
+
+```{r}
+#describe(wifidata[525:529])
+
+```
+

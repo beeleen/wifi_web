@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1568222586593.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "11DBBBFC",
+    "lastKnownWriteTime" : 1568238384,
+    "last_content_update" : 1568238384316,
+    "path" : "~/Documents/@/UBIQUM/DATAML/ModuleIOT/wifi_github/data-exploration.Rmd",
+    "project_path" : "data-exploration.Rmd",
+    "properties" : {
+        "cursorPosition" : "29,54",
+        "last_setup_crc32" : "",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

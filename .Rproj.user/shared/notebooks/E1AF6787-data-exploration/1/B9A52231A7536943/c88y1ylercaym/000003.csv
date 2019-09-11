@@ -1,0 +1,6 @@
+"0","#Create the correlation matrix
+corrData <- cor(wifidataTrain[,1:465])
+"
+"2","Error in `[.data.frame`(wifidataTrain, , 1:465) : 
+  undefined columns selected
+"

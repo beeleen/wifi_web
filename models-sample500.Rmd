@@ -1,0 +1,432 @@
+---
+title: "2. Random Forest from Caret Package with a sample of 500"
+author: virgen.io
+date: Aug-Sept, 2019
+output:
+   html_document:
+      includes:
+         after_body: footer.html
+         before_body: header.html
+      toc: true
+      toc_depth: 5
+      toc_float:
+          collapsed: false
+          smooth_scroll: true
+      theme: united
+      highlight: textmate
+
+---
+<h1> Initialize and Load Data </h1>
+```{r}
+pacman::p_load(ggplot2, dplyr, party, caret, corrplot, reshape, rpart, rattle, psych, tidyr, stringr, randomForest, tictoc, plotly)
+ 
+#Remove Scientific notations
+options(scipen=999)
+
+#Seed function
+ reset.seed <- function()
+{
+  set.seed(1337)
+ }
+ 
+#saveRDS(wifidataTrainNoCor, "wifidataTrainNoCor-8.rds")
+
+ 
+ setwd("~/Documents/@/UBIQUM/DATAML/ModuleIOT/wifi_github")
+
+wifidataTrainNoCor <-  readRDS("./RandomForest_500Random_Sample_Datasets/wifidataTrainNoCor-8.rds")
+reset.seed()
+```
+
+<h1>Cascade method</h1>
+
+<p>
+I wanted to have different random samples for each time I executed a model. I followed the next steps: </p>
+
+__For Predicting Building:__
+
+* __Part 1__<br>
+1. Select the 520 WAPS plus the variable I wanted to predict.<br>
+2. Select a random sample of 500 rows.<br>
+3. Split in Train and Test set.<br>
+
+* __Part 2__ <br>
+4. Train the model with the train set.<br>
+5. Predict the test set.<br>
+6. Post resample.<br>
+7. Get the Metrics.<br>
+8. Save the model.<br>
+
+ __For Predicting Floor, Longitude and Latitude:__
+
+* __Part 1__ 
+1. Load the previous model.
+2. Select the 520 WAPS plus the variable I wanted to predict.
+3. Select a random sample of 500 rows.
+4. Split in Train and Test set.
+5. Predict the previous variable(s) and add it(them) in new column(s) in the train and test set.
+
+* __Part 2__
+6. Train the model with the train set.
+7. Predict the test set.
+8. Post resample.
+9. Get the Metrics.
+10. Save the model.
+
+```{r}
+
+```
+
+
+<h1> Predicting Building</h1>
+
+<h2> Part 1</h2>
+```{r}
+######################################################################################BUILDINGID###################################################################################################
+
+
+#Select variables only with WAPS + BUILDINGID
+
+wifiWapsBuilding <- wifidataTrainNoCor %>% select(1:379,383)
+
+
+#Sample WAPS + BUILDINGID
+wifiTrainSampleBuilding <- wifiWapsBuilding[sample(1:nrow(wifiWapsBuilding), 500,
+   replace=FALSE),] 
+
+
+#Splitting
+intrainWapsBuilding <- createDataPartition(y = wifiTrainSampleBuilding$BUILDINGID, p= 0.7, list = FALSE)
+trainWapsBuilding <- wifiTrainSampleBuilding[intrainWapsBuilding, ]
+testWapsBuilding <-  wifiTrainSampleBuilding[-intrainWapsBuilding, ]
+
+
+
+```
+<h2> Part 2</h2>
+```{r}
+############################################BUILDINGID######################################################################################################################
+
+
+#random forest ~BUILDINGID @Caret
+      #plsFitWapsBuilding <- train(BUILDINGID~., data = trainWapsBuilding, method = "rf") 
+      
+
+#Load model from Building
+load("RandomForest_500Random_Sample_Models/WapsBuildingRF.rda")
+plsFitWapsBuilding
+
+ #mtry  Accuracy   Kappa    
+ #   2   0.5888201  0.2422026
+ # 190   0.9775510  0.9643620 *I selected this mtry for the next models
+ # 379   0.9700023  0.9525484
+
+#Predict the Test data
+predrf_Building <- predict(plsFitWapsBuilding, newdata = testWapsBuilding)
+
+#Post Resample Metrics
+pred_metric_rf_Building <- 
+postResample(testWapsBuilding$BUILDINGID, predrf_Building)
+#Metrics
+pred_metric_rf_Building
+ #Accuracy     Kappa 
+#0.9865772 0.9789370
+
+#Create a new column with predictions
+testWapsBuildingRF <- testWapsBuilding
+testWapsBuildingRF$Predicted <- predrf_Building
+
+confusionMatrix(data= testWapsBuildingRF$Predicted, reference =testWapsBuildingRF$BUILDINGID)
+
+
+#Save model into a CSV
+      #save(plsFitWapsBuilding, file = "WapsBuildingRF.rda")
+
+```
+
+
+<h1> Predicting Floor</h1>
+<h2> Part 1</h2>
+```{r}
+############################################FLOOR######################################################################################################################
+
+#Load model from Building
+load("RandomForest_500Random_Sample_Models/WapsBuildingRF.rda")
+
+#Select variables only with WAPS + FLOOR
+
+wifiWapsFloor <- wifidataTrainNoCor %>% select(1:379,382)
+
+#Sample WAPS + FloorID
+wifiTrainSampleFloor <- wifiWapsFloor[sample(1:nrow(wifiWapsFloor), 500,
+   replace=FALSE),] 
+
+#Splitting
+intrainWapsFloor <- createDataPartition(y = wifiTrainSampleFloor$FLOOR, p= 0.7, list = FALSE)
+trainWapsFloor <- wifiTrainSampleFloor[intrainWapsFloor, ]
+testWapsFloor <-  wifiTrainSampleFloor[-intrainWapsFloor, ]
+
+
+#Predict the Building and put it in a new column in both, Train + Test set
+#in train
+predrf_Building_for_Floor <- predict(plsFitWapsBuilding, newdata = trainWapsFloor)
+trainWapsFloor$BUILDINGID <- predrf_Building_for_Floor
+
+#in test
+predrf_Building_for_Floor <- predict(plsFitWapsBuilding, newdata = testWapsFloor)
+testWapsFloor$BUILDINGID <- predrf_Building_for_Floor
+```
+
+
+<h2> Part 2</h2>
+```{r}
+############################################FLOOR######################################################################################################################
+
+
+            #random forest ~FLOOR @Caret
+            #plsFitWapsFloor <- train(FLOOR~., data = trainWapsFloor, method = "rf") 
+
+load("RandomForest_500Random_Sample_Models/WapsFloorRF.rda")
+plsFitWapsFloor
+
+#mtry  Accuracy   Kappa    
+#   2   0.3446047  0.1431072
+# 191   0.7062291  0.6141903 *I selected this mtry for the next models
+# 381   0.6851700  0.5870581
+
+#Predict the Test data
+predrf_Floor <- predict(plsFitWapsFloor, newdata = testWapsFloor)
+
+#Post Resample Metrics
+pred_metric_rf_Floor <- 
+postResample(testWapsFloor$FLOOR, predrf_Floor)
+#Metrics
+pred_metric_rf_Floor
+# Accuracy     Kappa 
+#0.8040541 0.7419432
+
+#Create a new column with predictions
+testWapsFloorRF <- testWapsFloor
+testWapsFloorRF$PredictedFloor <- predrf_Floor
+
+confusionMatrix(data= testWapsFloorRF$PredictedFloor, reference = testWapsFloorRF$FLOOR)
+
+
+#Save model into a CSV
+#save(plsFitWapsFloor, file = "WapsFloorRF.rda")
+
+```
+
+<h1> Predicting Longitude</h1>
+<h2> Part 1</h2>
+```{r}
+############################################LONGITUDE######################################################################################################################
+
+reset.seed()
+
+#Load model from Building
+load("RandomForest_500Random_Sample_Models/WapsBuildingRF.rda") #plsFitWapsBuilding
+     
+#Load model from Floor
+load("RandomForest_500Random_Sample_Models/WapsFloorRF.rda") #plsFitWapsFloor
+
+#Select variables only with WAPS + LONGITUDE
+
+wifiWapsLongitude <- wifidataTrainNoCor %>% select(1:380)
+
+#Sample WAPS + LONGITUDE
+wifiTrainSampleLongitude <- wifiWapsLongitude[sample(1:nrow(wifiWapsLongitude), 500,
+   replace=FALSE),] 
+
+#Splitting
+intrainWapsLongitude <- createDataPartition(y = wifiTrainSampleLongitude$LONGITUDE, p= 0.7, list = FALSE)
+trainWapsLongitude <- wifiTrainSampleLongitude[intrainWapsLongitude, ]
+testWapsLongitude <-  wifiTrainSampleLongitude[-intrainWapsLongitude, ]
+
+
+#Predict the Building and put it in a new column in both, Train + Test set
+#in train
+predrf_Building_for_Longitude <- predict(plsFitWapsBuilding, newdata = trainWapsLongitude)
+trainWapsLongitude$BUILDINGID <- predrf_Building_for_Longitude
+
+#in test
+predrf_Building_for_Longitude2 <- predict(plsFitWapsBuilding, newdata = testWapsLongitude)
+testWapsLongitude$BUILDINGID <- predrf_Building_for_Longitude2
+
+
+
+#Predict the Floor and put it in a new column
+#in train
+predrf_Floor_for_Longitude <- predict(plsFitWapsFloor, newdata = trainWapsLongitude)
+trainWapsLongitude$FLOOR <- predrf_Floor_for_Longitude
+#predrf_Floor_for_Longitude why they are the same?
+#in test
+predrf_Floor_for_Longitude2 <- predict(plsFitWapsFloor, newdata = testWapsLongitude)
+testWapsLongitude$FLOOR<- predrf_Floor_for_Longitude2
+```
+
+
+´<h2> Part 2</h2>
+```{r}
+############################################LONGITUDE######################################################################################################################
+
+
+                  #random forest ~LONGITUDE @Caret
+                  #plsFitWapsLongitude <- train(LONGITUDE~., data = trainWapsLongitude, method = "rf") 
+load("RandomForest_500Random_Sample_Models/WapsLongitudeRF.rda")
+plsFitWapsLongitude
+
+# mtry  RMSE      Rsquared   MAE     
+#    2   93.08891  0.8937296  85.28058
+#  193   22.23506  0.9697075  13.53111 *I selected this mtry for the next models
+#  385   24.54994  0.9626794  14.52663
+
+#Predict the Test data
+predrf_Longitude <- predict(plsFitWapsLongitude, newdata = testWapsLongitude)
+
+#Post Resample Metrics
+pred_metric_rf_Longitude <- 
+postResample(testWapsLongitude$LONGITUDE, predrf_Longitude)
+#Metrics
+pred_metric_rf_Longitude
+
+#      RMSE   Rsquared        MAE 
+#23.6837254  0.9663791 14.5976072 
+
+#Create a new column with predictions
+testWapsLongitudeRF <- testWapsLongitude
+testWapsLongitudeRF$PredictedLongitude <- predrf_Longitude
+
+#Save model into a CSV
+#save(plsFitWapsLongitude, file = "WapsLongitudeRF.rda")
+```
+
+´<h2> Analyzing errors</h2>
+```{r}
+#Create a distribution analysis here
+testWapsLongitudeRF$error <- (testWapsLongitudeRF$PredictedLongitude - testWapsLongitudeRF$LONGITUDE)/(length(testWapsLongitudeRF))
+
+#plot(predrf_Longitude)
+ggplot(testWapsLongitudeRF, aes(error, PredictedLongitude)) + geom_point(aes()) 
+
+
+
+```
+
+
+<h1> Predicting Latitude</h1>
+´<h2> Part 1</h2>
+
+```{r}
+############################################LATITUDE######################################################################################################################
+
+reset.seed()
+
+#Load model from Building
+load("RandomForest_500Random_Sample_Models/WapsBuildingRF.rda") #plsFitWapsBuilding
+     
+#Load model from Floor
+load("RandomForest_500Random_Sample_Models/WapsFloorRF.rda") #plsFitWapsFloor
+
+#Load model from Longitude
+load("RandomForest_500Random_Sample_Models/WapsLongitudeRF.rda") #plsFitWapsLongitude
+
+
+#Select variables only with WAPS + LATITUDE
+
+wifiWapsLatitude <- wifidataTrainNoCor %>% select(1:379, 381)
+
+#Sample WAPS + LATITUDE
+wifiTrainSampleLatitude <- wifiWapsLatitude[sample(1:nrow(wifiWapsLatitude), 500,
+   replace=FALSE),] 
+
+#Splitting
+intrainWapsLatitude <- createDataPartition(y = wifiTrainSampleLatitude$LATITUDE, p= 0.7, list = FALSE)
+trainWapsLatitude <- wifiTrainSampleLatitude[intrainWapsLatitude, ]
+testWapsLatitude <-  wifiTrainSampleLatitude[-intrainWapsLatitude, ]
+
+
+
+
+#Predict the Building and put it in a new column in both, Train + Test set
+#in train
+predrf_Building_for_Latitude <- predict(plsFitWapsBuilding, newdata = trainWapsLatitude)
+trainWapsLatitude$BUILDINGID <- predrf_Building_for_Latitude
+
+#in test
+predrf_Building_for_Latitude2 <- predict(plsFitWapsBuilding, newdata = testWapsLatitude)
+testWapsLatitude$BUILDINGID <- predrf_Building_for_Latitude2
+
+
+
+#Predict the Floor and put it in a new column
+#in train
+predrf_Floor_for_Latitude <- predict(plsFitWapsFloor, newdata = trainWapsLatitude)
+trainWapsLatitude$FLOOR <- predrf_Floor_for_Latitude
+#predrf_Floor_for_Latitude why they are the same?
+#in test
+predrf_Floor_for_Latitude2 <- predict(plsFitWapsFloor, newdata = testWapsLatitude)
+testWapsLatitude$FLOOR<- predrf_Floor_for_Latitude2
+
+
+
+#Predict the Longitude and put it in a new column
+#in train
+predrf_Longitude_for_Latitude <- predict(plsFitWapsLongitude, newdata = trainWapsLatitude)
+trainWapsLatitude$LONGITUDE <- predrf_Longitude_for_Latitude
+#predrf_Floor_for_Latitude why they are the same?
+#in test
+predrf_Longitude_for_Latitude2 <- predict(plsFitWapsLongitude, newdata = testWapsLatitude)
+testWapsLatitude$LONGITUDE<- predrf_Longitude_for_Latitude2
+
+```
+
+
+´<h2> Part 2</h2>
+```{r}
+############################################LATITUDE######################################################################################################################
+
+            #random forest ~FLOOR @Caret
+            #plsFitWapsLatitude <- train(LATITUDE~., data = trainWapsLatitude, method = "rf") 
+load("RandomForest_500Random_Sample_Models/WapsLatitudeRF.rda") #plsFitWapsBuilding
+plsFitWapsLatitude
+
+#  mtry  RMSE      Rsquared  MAE     
+#    2   49.69596  0.853228  40.48128
+#  194   16.29938  0.939995  11.50426 *I selected this mtry for the next models
+#  386   17.54124  0.929862  11.98166
+
+#Predict the Test data
+predrf_Latitude <- predict(plsFitWapsLatitude, newdata = testWapsLatitude)
+
+#Post Resample Metrics
+pred_metric_rf_Latitude <- 
+postResample(testWapsLatitude$LATITUDE, predrf_Latitude)
+#Metrics
+pred_metric_rf_Latitude
+
+#      RMSE   Rsquared        MAE 
+#13.9265993  0.9580016  9.9114249  
+
+#Create a new column with predictions
+testWapsLatitudeRF <- testWapsLatitude
+testWapsLatitudeRF$PredictedLatitude <- predrf_Latitude
+
+```
+
+´<h2> Analyzing errors</h2>
+```{r}
+
+#Create a distribution analysis here
+testWapsLatitudeRF$error <- (testWapsLatitudeRF$PredictedLatitude - testWapsLatitudeRF$LATITUDE)/(length(testWapsLatitudeRF))
+
+#plot(predrf_Latitude)
+ggplot(testWapsLatitudeRF, aes(error, PredictedLatitude)) + geom_point(aes()) 
+
+
+#Save model into a CSV
+#save(plsFitWapsLatitude, file = "WapsLatitudeRF.rda")
+
+
+```
+

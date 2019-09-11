@@ -1,0 +1,262 @@
+---
+title: "Error analysis"
+output:
+ html_document:
+   toc: true
+   toc_depth: 5
+   toc_float:
+     collapsed: false
+     smooth_scroll: true
+     theme: cerulean
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<h1> Initialize and Load Data </h1>
+```{r }
+# Initialize and Load Data {#init}
+pacman::p_load(ggplot2, dplyr, party, caret, corrplot, reshape, rpart, rattle, psych, tidyr, stringr, randomForest, tictoc, plotly, readr,h2o, rstudioapi, randomForest, tibble)
+
+setwd("~/Documents/@/UBIQUM/DATAML/ModuleIOT/wifi_github")
+
+wifidataVal <- read.csv("./Error_Analysis_Datasets/wifidataValidationPreprocessed.csv")
+#wifidataValKNNBuilding <- read.csv("~/Documents/@/UBIQUM/DATAML/ModuleIOT/WIFI/datasets/wifidataValidationPreprocessedKNN.csv")
+
+#Remove Scientific notations
+options(scipen=999)
+
+#Seed function
+ reset.seed <- function()
+{
+  set.seed(1337)
+ }
+ 
+
+#wifidataVal %>% filter(RealFloor==0, BUILDINGIDKNN==2)
+```
+
+
+<h1>Make All predictions with Random Forest</h1>
+
+```{r}
+
+#RANDOM FOREST
+
+#Load model from Building, Floor, Latitude and Longitude
+load("Error_Analysis_Models/_WapsBuildingRF2.rda")
+load("Error_Analysis_Models/_WapsFloorRF2.rda") 
+load("Error_Analysis_Models/_WapsLatitudeRF2.rda")
+load("Error_Analysis_Models/_WapsLongitudeRF2.rda")
+
+#Predict Building in the Validation data
+predrf_Building <- predict(plsFitWapsBuilding, newdata = wifidataVal)
+
+#Create a new column with predicted values for Building
+wifidataVal$BUILDINGID <- predrf_Building
+
+#Predict Floor in the Validation data
+predrf_Floor <- predict(plsFitWapsFloor, newdata = wifidataVal)
+
+#Create a new column with predicted values for Floor
+wifidataVal$FLOOR <- predrf_Floor
+
+#Predict Latitude in the Validation data
+predrf_Latitude <- predict(plsFitWapsLatitude, newdata = wifidataVal)
+
+#Create a new column with predicted values for Latitude
+wifidataVal$LATITUDE <- predrf_Latitude
+
+#Predict Longitude in the Validation data
+predrf_Longitude <- predict(plsFitWapsLongitude, newdata = wifidataVal)
+
+#Create a new column with predicted values for Longitude
+wifidataVal$LONGITUDE <- predrf_Longitude
+
+
+
+
+```
+
+
+
+```{r}
+#Load original dataset
+wifidataValCOMPLETED <- read.csv("~/Documents/@/UBIQUM/DATAML/ModuleIOT/WIFI/datasets/validationData.csv")
+ 
+wifidataValCOMPLETED$BUILDINGID <- as.factor(wifidataValCOMPLETED$BUILDINGID) 
+wifidataValCOMPLETED$FLOOR <- as.factor(wifidataValCOMPLETED$FLOOR) 
+
+
+
+
+#Create an index of wifidataVal
+wifidataVal <- wifidataVal %>% mutate(id = rownames(wifidataVal))
+
+
+#Add the BUILDINGID from the Original dataset
+wifidataVal$RealBuildingId <- wifidataValCOMPLETED$BUILDINGID
+wifidataVal$RealBuildingId <- as.factor(wifidataVal$RealBuildingId) 
+
+#Add the FLOOR from the Original dataset
+wifidataVal$RealFloor <- wifidataValCOMPLETED$FLOOR
+wifidataVal$RealFloor <- as.factor(wifidataVal$RealFloor) 
+
+#Add the LONGITUDE from the Original dataset
+wifidataVal$RealLongitude <- wifidataValCOMPLETED$LONGITUDE
+
+#Add the LATITUDE from the Original dataset
+wifidataVal$RealLatitude <- wifidataValCOMPLETED$LATITUDE
+
+#Select only the Columns for Position
+#wifidataValPositionVars <-  wifidataVal %>% select(RealFloor, RealLongitude, RealLatitude, RealBuildingId)
+
+```
+
+<h2> Consufion Matrix </h2>
+```{r}
+#Confusion Matrix for Building
+confusionMatrix(data= wifidataVal$BUILDINGID, reference =wifidataVal$RealBuildingId)
+
+```
+
+<h2> 3D Buildings for BUILDINGID</h2>
+```{r}
+
+#Analyzing the lowest Class Recall: Building 0
+#Plot Building 0
+plot_ly(wifidataVal %>% filter(RealBuildingId==0) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+#Was Building 0 but it predicted Building 1
+plot_ly(wifidataVal %>% filter(RealBuildingId==0, BUILDINGID==1) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor"))) 
+
+#Was Building 0 but it predicted Building 2
+plot_ly(wifidataVal %>% filter(RealBuildingId==0, BUILDINGID==2) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+
+```
+
+```{r}
+#Confusion Matrix for Floor
+confusionMatrix(data= wifidataVal$FLOOR, reference =wifidataVal$RealFloor)
+
+ #Lowest Pos. Predic. Value are  0.7738 for Class    0.7277 
+```
+
+
+<h2> 3D Buildings for FLOOR</h2>
+
+```{r}
+#Type of errors
+
+
+#Analyzing the lowest Class Recall: Building 0
+```
+
+
+<h2> Features Importance </h2>
+
+```{r}
+
+#I want to map the most important variables used to predict the Building
+#VarImp of the model
+RFvarImpBuilding <- varImp(plsFitWapsBuilding) 
+has_rownames(RFvarImpBuilding)
+RFvarImpBuilding <- rownames_to_column(RFvarImpBuilding, var="WAPS") 
+
+#Select only the WAPS with VarImp greater than 10
+RFvarImpBuilding <- RFvarImpBuilding %>% filter(Overall>10) 
+
+
+wapsVarImportance <- RFvarImpBuilding$WAPS
+#Select only those WAPS with VarImp in the Validation Set
+wifidataValRFvarImpBuilding <- wifidataVal %>% select(wapsVarImportance, 521:526)
+
+```
+
+
+```{r}
+#Identify the Rows where a particular WAP has intensity different to 100 and summarize
+wifidataValRFvarImpSummarized <- wifidataValRFvarImpBuilding  %>%
+ gather( "WAPS", "Value", 1:55)  %>%filter(Value<100)  %>%group_by(WAPS) %>% summarise(
+meanRRSSI=mean(Value), sdRRSSI=sd(Value), minRRSSI=min(Value), maxRRSSI=max(Value), n_distinct(Value)) %>% left_join( RFvarImpBuilding, by="WAPS")
+
+#meanLat=mean(RealLatitude), minLat=min(RealLatitude), maxLat=max(RealLatitude), meanLong=mean(RealLongitude), minLong=min(RealLongitude),  maxLong=max(RealLongitude), meanFloor=mean(as.numeric(RealFloor)), meanBuild=mean(as.numeric(RealBuildingId)),minBuild=min(as.numeric(RealBuildingId)),maxBuild=max(as.numeric(RealBuildingId)),minFloor=min(as.numeric(RealFloor)),maxFloor=max(as.numeric(RealFloor)))  %>% left_join( RFvarImpBuilding, by="WAPS")
+
+wifidataValRFvarImpSummarized
+
+  #Plot the summarized values of intensity for each WAP
+PlotwifidataValRFvarImpSummarized <- wifidataValRFvarImpSummarized %>% ggplot(aes(maxRRSSI, WAPS)) + geom_point(aes(size=Overall)) 
+  
+  #plotly
+PlotwifidataValRFvarImpSummarized %>% ggplotly()
+
+#Plot the same info but in coordinates
+#Bind the Two dataframes
+#plot_ly(wifidataValRFvarImpSummarized %>% filter(round(meanBuild)==2), x = ~meanLong, y = ~meanLat, z = ~meanFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+
+
+```
+
+<h1> KNN </h1>
+```{r}
+
+#KNN
+
+#Load model from Building
+#load("WapsBuildingKnn.rda")
+
+#Create a new column with predictions
+#wifidataVal$BUILDINGIDKNN <- plsFitWapsBuildingTRAINVal
+```
+
+<h2> Consufion Matrix </h2>
+
+```{r}
+
+#Confusion Matrix for Validation
+#confusionMatrix(data= wifidataVal$BUILDINGIDKNN, reference =wifidataVal$RealBuildingId)
+
+
+```
+
+<h2> 3D Buildings </h2>
+
+```{r}
+#Analyzing error in Building 0
+#Was Building 0 but it predicted Building 2
+#plot_ly(wifidataVal %>% filter(RealBuildingId==0, BUILDINGIDKNN==2) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+
+#Analyzing the lowest Class Recall: Building 1
+#Plot Building 1
+#plot_ly(wifidataVal %>% filter(RealBuildingId==1) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+#Was Building 1 but it predicted Building 0
+#plot_ly(wifidataVal %>% filter(RealBuildingId==1, BUILDINGIDKNN==0) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+#Was Building 1 but it predicted Building 2
+#plot_ly(wifidataVal %>% filter(RealBuildingId==1, BUILDINGIDKNN==2) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+#FalsePositiveof0 <- wifidataVal %>% filter(RealBuildingId==1, BUILDINGIDKNN==0) %>%  gather( "RRSSI", "Value", 1:520)
+ 
+#summary(FalsePositiveof0$Value)
+#Analyzing distribution in Building 2
+#plot_ly(wifidataVal %>% filter(RealBuildingId==2) , x = ~RealLongitude, y = ~RealLatitude, z = ~RealFloor, size = 0.03) %>% add_markers() %>% layout(scene = list(xaxis = list(title = "Longitude"), yaxis = list(title = "Latitude"), zaxis = list(title = "Floor")))
+
+#describe(FalsePositiveof0 %>% filter(Value<100))
+
+
+
+#Because the False Positives of Building 2 are the biggest I wanted to map the Floors
+
+
+```
+
+
+```{r}
+
+```
+
